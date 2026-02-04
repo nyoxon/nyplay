@@ -180,6 +180,7 @@ int init
 	st->state = STOPPED;
 	st->player_gain = 1.0; // default
 	st->played = 0;
+	st->playlist_random = 0;
 
 	create_playlist(st->dir_path, recursive, st);
 	st->current_track = 0;
@@ -187,6 +188,14 @@ int init
 	st->pcm = NULL;
 
 	return 0;
+}
+
+void print_usage(const char* program_name) {
+	printf("usage: %s [PATH] [RECURSIVE]\n\n", program_name);
+	printf("if [PATH] (relative or global) is omitted, then the directory\n");
+	printf("that will be used by the player will be the current directory ./\n");
+	printf("[RECURSIVE] must be 1 if you want the program to read the\n");
+	printf("directory recursively (default) or 0 otherwise\n");	
 }
 
 int main(int argc, const char* argv[]) {
@@ -202,18 +211,20 @@ int main(int argc, const char* argv[]) {
 	int recursive = 1;
 
 	if (argc == 1) {
+
 		snprintf(path, PATH_MAX_LENGTH, "%s", ".");
 	} else if (argc == 2) {
+		if (strcmp("usage", argv[1]) == 0) {
+			print_usage(argv[0]);
+			return 0;
+		}
+
 		snprintf(path, PATH_MAX_LENGTH, "%s", argv[1]);
 	} else if (argc == 3) {
 		snprintf(path, PATH_MAX_LENGTH, "%s", argv[1]);
 		recursive = atoi(argv[2]);
 	} else {
-		printf("usage: %s [PATH] [RECURSIVE]\n", argv[0]);
-		printf("if [PATH] (relative or global) is omitted, then the directory\n");
-		printf("that will be used by the player will be the current directory ./\n");
-		printf("[RECURSIVE] must be 1 if you want the program to read the\n");
-		printf("directory recursively (default) or 0 otherwise\n");
+		print_usage(argv[0]);
 		return -1;
 	}
 

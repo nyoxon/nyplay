@@ -1,6 +1,8 @@
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <assert.h>
 
 void print_riff_header(const struct riff_header* rhdr) {
 	printf("	--- RIFF HEADER --- 	\n");
@@ -120,4 +122,109 @@ int init_wav_buf(struct wav_information* wav) {
     }
 
 	return 0;
+}
+
+static int create_random_sequence(struct random_list* rl, size_t size, uint32_t current) {
+	if (size < 2) {
+		return 1;
+	}
+
+	srand((unsigned) time(NULL));
+
+	rl->indexes = malloc(size * sizeof(uint32_t));
+
+	if (!(rl->indexes)) {
+		return -1;
+	}
+
+	for (size_t i = 0; i < size; i++) {
+		(rl->indexes)[i] = i;
+	}
+
+
+	/*
+	if current != -1, then the user set the random flag during playing
+	some track.
+	therefore, we change the last number of the list (size - 1) with current
+	and decrement rl->size, ensuring that the current track won't play again.
+
+	ex: current = 5, size = 10
+	indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+	indexes[size - 1] = indexes[9] := current = 5
+	indexes[current] = indexes[5] := size - 1 = 9
+
+	result:
+	indexes = [0, 1, 2, 3, 4, 9, 6, 7, 8, 5]
+	(size--)
+
+	effective indexes:
+	indexes = [0, 1, 2, 3, 4, 9, 6, 7, 8]
+	*/
+
+	if (current >= size) {
+		free(rl->indexes);
+		rl->indexes = NULL;
+		return -1;
+	}
+
+	(rl->indexes)[size - 1] = current;
+	(rl->indexes)[current] = size - 1;
+	(size--);
+
+	// fisher-yates
+	for (size_t i = size - 1; i > 0; i--) {
+		size_t j = rand() % (i + 1);
+		uint32_t tmp = (rl->indexes)[i];
+		(rl->indexes)[i] = (rl->indexes)[j];
+		(rl->indexes)[j] = tmp;
+	}
+
+	rl->current = 0;
+	rl->size = size;
+	rl->waiting = 1;
+
+	return 0;
+}
+
+int random_list_init(struct random_list* rl, size_t size, uint32_t current) {
+	return create_random_sequence(rl, size, current);
+}
+
+int random_list_get_current(struct random_list* rl, uint32_t* current) {
+	if (!rl || !(rl->indexes)) {
+		return -1; // error
+	}
+
+	if (rl->current >= rl->size) {
+		return 1; // end
+	}
+
+	*current = (rl->indexes)[rl->current];
+
+	return 0; // success
+}
+
+int random_list_set_current(struct random_list* rl, uint32_t index) {
+	if (!rl || !(rl->indexes)) {
+		return -1;
+	}
+
+	if (index >= rl->size) {
+		return -1;
+	}
+
+	rl->current = index;
+	return 0;
+}
+
+void random_list_free(struct random_list* rl) {
+	if (!rl || !(rl->indexes)) {
+		return;
+	}
+
+	free(rl->indexes);
+	rl->indexes = NULL;
+	rl->current = 0;
+	rl->size = 0;
 }

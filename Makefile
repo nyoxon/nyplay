@@ -1,6 +1,6 @@
 CC := gcc
 CFLAGS :=
-TARGET = player
+TARGET = nyplay
 LDLIBS = -lasound
 
 SRCS = player.c cli_interface.c sound_engine.c types.c fd_handle.c

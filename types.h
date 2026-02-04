@@ -42,7 +42,7 @@ struct track {
 	double duration;
 };
 
-struct playlist {
+struct playlist { // a vector
 	struct track* items;
 	size_t len;
 	size_t cap;
@@ -73,6 +73,13 @@ struct wav_information {
 	int8_t* buf;
 };
 
+struct random_list {
+	uint32_t* indexes;
+	uint32_t current;
+	int waiting;
+	size_t size;
+};
+
 struct player_state {
 	int running; // controls main loop
 	int fd; // fd of the current archive
@@ -81,6 +88,8 @@ struct player_state {
 	int playlist_loop; // playlist will play on loop
 	int track_loop; // track will play on loop
 	size_t played; // how many tracks were played
+	int playlist_random;
+	struct random_list random_list;
 
 	enum ui_mode mode; // PLAYER or COMMAND
 	enum play_state state; // STOPPED or PLAYING or PAUSED
@@ -104,6 +113,13 @@ void playlist_free(struct playlist* pl);
 int playlist_push(struct playlist* pl, struct track t);
 void playlist_print(struct playlist* pl);
 void track_print(struct track* t);
+
+/* --- RANDOM LIST FUNCTIONS --- */
+
+int random_list_init(struct random_list* rl, size_t size, uint32_t current);
+int random_list_get_current(struct random_list* rl, uint32_t* current);
+int random_list_set_current(struct random_list* rl, uint32_t index);
+void random_list_free(struct random_list* rl);
 
 /* --- WAV ---*/
 

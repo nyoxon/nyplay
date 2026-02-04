@@ -89,9 +89,15 @@ static int player_to_command(struct player_state* st) {
 	st->playlist_loop = 0;
 	close(st->fd);
 	st->fd = -1;
+	st->playlist_random = 0;
 
 	free(st->wav.buf);
 	free(st->wav.buf32);
+
+	if (st->random_list.indexes) {
+		random_list_free(&st->random_list);
+	}
+
 	audio_shutdown(st);
 
 	drain_stdin();
@@ -179,10 +185,36 @@ int prev_music(struct player_state* st) {
 		return 2;
 	}
 
+	if (st->playlist_random) {
+		uint32_t current = 0;
+
+		if (st->random_list.current == 0) {
+			if (set_current_music(st, (st->random_list.indexes[st->random_list.size])) < 0) {
+				return -1;
+			}
+
+			st->random_list.waiting = 1;
+			return 0;
+		}
+
+		(st->random_list.current)--;
+		int ret = random_list_get_current(&st->random_list, &current);
+
+		if (ret != 0) {
+			return -1;
+		}
+
+		if (set_current_music(st, current) < 0) {
+			return -1;
+		}
+
+		st->current_track = current;
+		return 0;
+	}
+
 	if (set_current_music(st, st->current_track - 1) < 0) {
 		return -1;
 	}
-
 
 	return 0;
 }
@@ -199,6 +231,50 @@ int next_music(struct player_state* st) {
 		return 2;
 	}
 
+	if (st->playlist_random) {
+		uint32_t current;
+
+		if (st->random_list.waiting) {
+			random_list_get_current(&st->random_list, &current);
+
+			if (set_current_music(st, current) < 0) {
+				return -1;
+			}
+
+			st->random_list.waiting = 0;
+			st->current_track = current;
+			return 0;
+		}
+
+		(st->random_list.current)++;
+		int ret = random_list_get_current(&st->random_list, &current);
+
+		if (ret == -1) { // error
+			return -1;
+		} else if (ret == 1) { // end of the list
+			if (st->playlist_loop) {
+				current = (st->random_list.indexes)[0];
+
+				if (set_current_music(st, (st->random_list.indexes[st->random_list.size])) < 0) {
+					return -1;
+				}
+
+				st->random_list.current = 0;
+				st->random_list.waiting = 1;
+				return 2;
+			} else {
+				return -1; // not a error, but end of player state
+			}
+		}
+
+		if (set_current_music(st, current) < 0) {
+			return -1;
+		}
+
+		st->current_track = current;
+		return 0;
+	}
+
 	if (st->current_track >= st->playlist.len - 1) {
 		if (st->playlist_loop) {
 			if (set_current_music(st, 0) < 0) {
@@ -208,9 +284,10 @@ int next_music(struct player_state* st) {
 
 			return 0;
 		} else {
-			return -1;
+			return -1; // not a error, but end of player state
 		}
 	}
+
 
 	if (set_current_music(st, st->current_track + 1) < 0) {
 		fprintf(stderr, "playing wav failed\n");
@@ -280,6 +357,13 @@ void process_command_input(char* line, struct player_state* st) {
 			printf("current playlist is empty\n\n");
 			return;
 		}
+
+		if (st->playlist_random) {
+			next_music(st);
+			command_to_player(st);
+			return;
+		}
+
 		if (count == 1) {
 			if (set_current_music(st, 0) < 0) {
 				fprintf(stderr, "playing wav failed\n");
@@ -337,6 +421,10 @@ void command_loop(struct player_state* st, volatile sig_atomic_t* should_exit) {
 		}
 
 		process_command_input(line, st);
+	}
+
+	if (st->random_list.indexes) {
+		random_list_free(&st->random_list);
 	}
 }
 
@@ -403,15 +491,57 @@ static void render_ui(struct player_state* st) {
 			st->current_track + 1, st->playlist.len, t->name);
 		printf("volume: %.1f%\n", st->player_gain * 100.0);
 
+		if (st->playlist_loop) {
+			printf("playlistloop: enabled\n");
+		} else {
+			printf("playlistloop: disabled\n");
+		}
+
 		if (st->track_loop) {
 			printf("looptrack: enabled\n");
 		} else {
 			printf("looptrack: disabled\n");
 		}
 
+		if (st->playlist_random) {
+			printf("random: enabled\n");
+		} else {
+			printf("random: disabled\n");
+		}
+
 		render_progress_bar(st, UI_WIDTH);
 		printf("\n(space) play/pause  (d) next  (a) prev  (l) loop  (q) quit\n");
-		printf("(w) volume up  (s) volume down  (,) -5 seconds  (.) +5 seconds\n\n");
+		printf("(w) volume up  (s) volume down  (,) -5 seconds  (.) +5 seconds  (r) random\n\n");
+	}
+}
+
+static int handle_random_playlist(struct player_state* st) {
+	if (!st->playlist_random) {
+		st->playlist_random = 1;
+
+		struct random_list random_list = {0};
+		random_list.indexes = NULL;
+
+		int ret = random_list_init(&random_list,
+			st->playlist.len, (uint32_t) st->current_track);
+
+		if (ret < 0) {
+			return -1;
+		} else if (ret == 1) { // just one wav
+			return 0;
+		}
+
+		st->random_list = random_list;
+
+		return 0;
+	} else {
+		st->playlist_random = 0;
+
+		if (st->random_list.indexes) {
+			random_list_free(&st->random_list);
+		}
+
+		return 0;
 	}
 }
 
@@ -458,6 +588,10 @@ static int process_key(struct player_state* st, char c) {
 		return 0;
 	}
 
+	if (c == 'r') {
+		return handle_random_playlist(st);
+	}
+
 	return 0;
 }
 
@@ -489,8 +623,9 @@ void player_loop(struct player_state* st, volatile sig_atomic_t* should_exit) {
 
 			if (st->mode == PLAYER) {
 				player_to_command(st);
-				break;
 			}
+
+			break;
 		}
 
 		int ret = process_player_input(st);
