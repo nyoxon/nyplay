@@ -317,10 +317,6 @@ void print_about() {
 	printf("\033[H\033[J");
 	printf("	--- ABOUT ---\n\n");
 	printf("this is a simple wav player written in C and using ALSA\n\n");
-	printf("it is currently inefficient in memory,\n");
-	printf("because to read a .wav it is necessary to copy\n");
-	printf("all the memory of the file into the program's\n");
-	printf("memory before instead of reading the data on demand\n\n");
 	printf("in this player you can play a list of.wav files\n");
 	printf("within a directory (recursively if you enable this option)\n\n");
 	printf("a file is identified as .wav only by its name, which means\n");
