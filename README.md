@@ -59,7 +59,7 @@ Command Mode: mode you are in when you start the program and that is the mode wh
 
 Player Mode: mode you are in when there is some wav being played. As with Command Mode, you can also give some commands to the program, such as go to the next song, advance 5s, pause etc (you need to write the command (ex: q for quit) and press enter afterwards).
 
-# Implementation comments
+# Implementation commentaries
 
 The program uses alsa/asoundlib.h, anything else is manually implemented.
 
