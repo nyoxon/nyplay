@@ -211,7 +211,6 @@ int main(int argc, const char* argv[]) {
 	int recursive = 1;
 
 	if (argc == 1) {
-
 		snprintf(path, PATH_MAX_LENGTH, "%s", ".");
 	} else if (argc == 2) {
 		if (strcmp("usage", argv[1]) == 0) {
@@ -229,6 +228,7 @@ int main(int argc, const char* argv[]) {
 	}
 
 	struct player_state st = {0};
+	st.show_commands = 1;
 
 	int ret = init(path, recursive, &st);
 

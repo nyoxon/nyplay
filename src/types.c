@@ -98,7 +98,7 @@ void playlist_print(struct playlist* pl) {
 
 	for (size_t i = 0; i < pl->len; i++) {
 		struct track* t = &pl->items[i];
-		printf("track %d\n", i + 1);
+		printf("track %ld\n", i + 1);
 
 		track_print(t);
 	}
@@ -106,7 +106,7 @@ void playlist_print(struct playlist* pl) {
 
 void printf_wav_information(struct wav_information* wav) {
 	printf("	---	 WAV INFORMATION ---\n");
-	printf("data_size: %d\n", wav->data_size);
+	printf("data_size: %ld\n", wav->data_size);
 	printf("channels: %d\n", wav->channels);
 	printf("sample_rate: %d\n", wav->sample_rate);
 	printf("bits_per_sample: %d\n\n", wav->bits_per_sample);

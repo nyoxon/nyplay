@@ -1,18 +1,25 @@
 CC := gcc
-CFLAGS :=
-TARGET = nyplay
+CFLAGS := -Wall -Wextra -g
 LDLIBS = -lasound
 
-SRCS = player.c cli_interface.c sound_engine.c types.c fd_handle.c
-OBJS = $(SRCS:.c=.o)
+TARGET = nyplay
+
+SRCDIR = src
+OBJDIR = build
+
+SRCS = player.c cli_interface.c fd_handle.c sound_engine.c types.c
+OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
-
-%.o: %.c
+	
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
 clean:
-	rm -rf $(OBJS) $(TARGET)
+	rm -rf $(OBJDIR) $(TARGET)

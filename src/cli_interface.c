@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <time.h>
+#include <termios.h>
 
 /*
 3 -> pause
@@ -16,6 +17,8 @@
 -1 -> error/stop playing
 -2 -> error/continue playing
 */
+
+static struct termios orig_termios;
 
 static int is_wav(const char* name) {
 	const char* dot = strrchr(name, '.');
@@ -67,10 +70,44 @@ void list_wavs
 	closedir(dir);
 }
 
+void enable_raw_mode() {
+	if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) {
+		exit(1);
+	}
+
+	atexit(disable_raw_mode);
+
+	struct termios raw = orig_termios;
+
+	raw.c_lflag &= ~(ECHO | ICANON);
+	raw.c_lflag &= ~(ISIG);
+	raw.c_iflag &= ~(IXON);
+	raw.c_cc[VMIN] = 1;
+	raw.c_cc[VTIME] = 0;
+
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
+		exit(1);
+	}	
+}
+
+void disable_raw_mode() {
+	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
 int command_to_player(struct player_state* st) {
+	if (audio_init(st) < 0) {
+		return -1;
+	}
+
 	st->mode = PLAYER;
 	st->state = PLAYING;
-	audio_init(st);
+
+
+	enable_raw_mode();
+
+	printf("\033[?25l");
+
+	return 0;
 }
 
 static void drain_stdin(void) {
@@ -100,7 +137,12 @@ static int player_to_command(struct player_state* st) {
 
 	audio_shutdown(st);
 
+	disable_raw_mode();
+	printf("\033[?25h");
+
 	drain_stdin();
+
+	return 0;
 }
 
 struct track* get_current_music(struct player_state* st) {
@@ -356,7 +398,11 @@ void process_command_input(char* line, struct player_state* st) {
 
 		if (st->playlist_random) {
 			next_music(st);
-			command_to_player(st);
+
+			if (command_to_player(st) < 0) {
+				return;
+			}
+
 			return;
 		}
 
@@ -377,7 +423,10 @@ void process_command_input(char* line, struct player_state* st) {
 			}
 		}
 
-		command_to_player(st);
+		if (command_to_player(st) < 0) {
+			return ;
+		}
+
 	} else if (strcmp(cmd, "loop") == 0) {
 		st->playlist_loop = (st->playlist_loop) ? 0 : 1;
 
@@ -401,8 +450,9 @@ void command_loop(struct player_state* st, volatile sig_atomic_t* should_exit) {
 	char line[256];
 	int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
 	fcntl(STDIN_FILENO, F_SETFL, flags & ~O_NONBLOCK);
-	printf("\033[H\033[J");
-	printf("COMMAND MODE (help for list of commands)\n\n");
+	printf("\033[H\033[2J");
+	printf("\033[1;34mNYPLAY\033[0m a simple cli wav player\n");
+	printf("\033[1;33mCOMMAND MODE\033[0m --- \033[35m(help)\033[0m for list of commands\n\n");
 
 	while (st->running && (st->mode == COMMAND)) {
 		if (*should_exit) {
@@ -454,7 +504,9 @@ static void render_progress_bar(struct player_state* st, int width) {
 
 	for (int i = 0; i < width; i++) {
 		if (i < filled) {
+			printf("\033[33m");
 			putchar('#');
+			printf("\033[0m");
 		} else {
 			putchar('-');
 		}
@@ -483,31 +535,106 @@ static void render_ui(struct player_state* st) {
 
 	if (st->state == PLAYING) {
 		struct track* t = get_current_music(st);
-		printf("current track [%d/%d]: %s\n",
-			st->current_track + 1, st->playlist.len, t->name);
-		printf("volume: %.1f%\n", st->player_gain * 100.0);
+		printf("\033[4;37mcurrent track\033[0m");
+		printf(" [%ld/%ld]: ",
+			st->current_track + 1, st->playlist.len);
+		printf("\033[36m");
+		printf("%s", t->name);
+		printf("\033[0m\n");
+		printf("\033[4;37mvolume\033[0m: %.1f%%\n", st->player_gain * 100.0);
 
+		printf("\033[4;37mplaylistloop\033[0m: ");
 		if (st->playlist_loop) {
-			printf("playlistloop: enabled\n");
+			printf("\033[34m");
+			printf("enabled");
+			printf("\033[0m\n");
 		} else {
-			printf("playlistloop: disabled\n");
+			printf("\033[31m");
+			printf("disabled");
+			printf("\033[0m\n");
 		}
 
+		printf("\033[4;37mlooptrack\033[0m: ");
 		if (st->track_loop) {
-			printf("looptrack: enabled\n");
+			printf("\033[34m");
+			printf("enabled");
+			printf("\033[0m\n");
 		} else {
-			printf("looptrack: disabled\n");
+			printf("\033[31m");
+			printf("disabled");
+			printf("\033[0m\n");
 		}
 
+		printf("\033[4;37mrandom\033[0m: ");
 		if (st->playlist_random) {
-			printf("random: enabled\n");
+			printf("\033[34m");
+			printf("enabled");
+			printf("\033[0m\n");
 		} else {
-			printf("random: disabled\n");
+			printf("\033[31m");
+			printf("disabled");
+			printf("\033[0m\n");
 		}
+
+		printf("\n");
 
 		render_progress_bar(st, UI_WIDTH);
-		printf("\n(space) play/pause  (d) next  (a) prev  (l) loop  (q) quit\n");
-		printf("(w) volume up  (s) volume down  (,) -5 seconds  (.) +5 seconds  (r) random\n\n");
+		printf("\n");
+
+		if (st->show_commands) {
+			printf("\n\033[35m");
+			printf("(space) ");
+			printf("\033[0m");
+			printf("play/pause");
+
+			printf("\n\033[35m");
+			printf("(a) ");
+			printf("\033[0m");
+			printf("prev");
+
+			printf("\n\033[35m");
+			printf("(l) ");
+			printf("\033[0m");
+			printf("loop");
+
+			printf("\n\033[35m");
+			printf("(q) ");
+			printf("\033[0m");
+			printf("quit");
+
+			printf("\n\033[35m");
+			printf("(w) ");
+			printf("\033[0m");
+			printf("volume up");
+
+			printf("\n\033[35m");
+			printf("(s) ");
+			printf("\033[0m");
+			printf("volume down");
+
+			printf("\n\033[35m");
+			printf("(,) ");
+			printf("\033[0m");
+			printf("-5 seconds");
+
+			printf("\n\033[35m");
+			printf("(.) ");
+			printf("\033[0m");
+			printf("+5 seconds");
+
+			printf("\n\033[35m");
+			printf("(r) ");
+			printf("\033[0m");
+			printf("random");
+
+			printf("\n\033[35m");
+			printf("(h) ");
+			printf("\033[0m");
+			printf("show/hide commands");
+
+			printf("\n");
+		}
+
 	}
 }
 
@@ -560,8 +687,19 @@ static int process_key(struct player_state* st, char c) {
 		return 0;
 	}
 
+	if (c == 'h') {
+		if (st->show_commands) {
+			st->show_commands = 0;
+		} else {
+			st->show_commands = 1;
+		}
+	}
+
 	if (c == 's') {
-		st->player_gain -= 0.1;
+		if (st->player_gain > 0.0f) {
+			st->player_gain -= 0.1;
+		}
+
 		return 0;
 	}
 
@@ -660,6 +798,8 @@ void player_loop(struct player_state* st, volatile sig_atomic_t* should_exit) {
 
 void print_wav(const char* path, const char* fullname, void* userdata) {
 	(void) userdata;
+	(void) fullname;
+
 	printf("%s\n", path);
 }
 

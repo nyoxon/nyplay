@@ -5,7 +5,7 @@
 #include <fcntl.h>
 
 ssize_t read_bytes_from_file(int fd, void* buf, size_t size) {
-	ssize_t total_read = 0;
+	size_t total_read = 0;
 	ssize_t n;
 
 	while (total_read < size) {

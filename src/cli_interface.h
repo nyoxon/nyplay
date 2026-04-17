@@ -4,9 +4,6 @@ there are 3 I/O lines that must me implemented:
 - user input
 - UI update
 
-i could use threads if a wanted to create a more complex wav player, but
-i'm using poll() for now
-
 the main loop must be:
 
 loop {
@@ -51,6 +48,9 @@ void player_loop(struct player_state* st, volatile sig_atomic_t* should_exit);
 
 // handle user input on player mode
 int process_player_input(struct player_state* st);
+
+void enable_raw_mode();
+void disable_raw_mode();
 
 /*	--- CALLBACKS --- */
 

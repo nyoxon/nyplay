@@ -57,7 +57,7 @@ There are two modes of operation in the program
 
 Command Mode: mode you are in when you start the program and that is the mode where no WAV files are being played yet and mode in which you use commands like help and list.
 
-Player Mode: mode you are in when there is some wav being played. As with Command Mode, you can also give some commands to the program, such as go to the next song, advance 5s, pause etc (you need to write the command (ex: q for quit) and press enter afterwards).
+Player Mode: mode you are in when there is some wav being played. As with Command Mode, you can also give some commands to the program, such as go to the next song, advance 5s, pause etc (you need to write the command (ex: q for quit)).
 
 # Implementation commentaries
 
@@ -68,3 +68,7 @@ Reading the Data Section of the WAV file is done using chunks of fixed size ever
 There are some other details within the files, about structs used for example, but not very in-depth since I didn't want to document the code.
 
 I did everything so that there was no problem, more specifically memory management, but since we are in C and I'm not very smart sometimes, something bizarre can end up happening somewhere.
+
+# Valgrind test
+
+When using Valgrind to detect memory leaks, we see that it detects possible leaks coming from the internal functions used by alsa/asoundlib.h, which it cannot identify if an allocated memory has been freed. In other words, this isn't an internal problem in my code, and it's actually not a problem in the code of Asoundlib.h. The latter would be a problem if, by playing multiple audios in a row, the amount of memory that Valgrind says may not have been freed up increased, which it doesn't.

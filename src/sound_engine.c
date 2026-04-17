@@ -61,7 +61,7 @@ int convert_wav_to_32
 {
 	size_t total_samples = frames * st->wav.channels;
 
-	const uint8_t* src = st->wav.buf;
+	const uint8_t* src = (const uint8_t*) st->wav.buf;
 	int32_t* dst = st->wav.buf32;
 
 	for (size_t i = 0; i < total_samples; i++) {
@@ -96,7 +96,6 @@ int convert_wav_to_32
 int audio_init(struct player_state* st) 
 {
 	int err;
-
 
 	if ((err = snd_pcm_open(&st->pcm, "default",
 		SND_PCM_STREAM_PLAYBACK, 0)) < 0) {

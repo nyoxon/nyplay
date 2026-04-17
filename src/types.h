@@ -100,6 +100,8 @@ struct player_state {
 
 	snd_pcm_t *pcm;
 	struct wav_information wav;
+
+	int show_commands;
 };
 
 void print_riff_header(const struct riff_header* rhdr);
