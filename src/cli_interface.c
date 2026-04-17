@@ -593,6 +593,11 @@ static void render_ui(struct player_state* st) {
 			printf("prev");
 
 			printf("\n\033[35m");
+			printf("(d) ");
+			printf("\033[0m");
+			printf("next");
+
+			printf("\n\033[35m");
 			printf("(l) ");
 			printf("\033[0m");
 			printf("loop");
